@@ -1,0 +1,350 @@
+<!--
+CandyCrush
+Your Name: Dylan Ou
+Collaborators: None
+-->
+
+<!DOCTYPE html>
+<html>
+<!--
+/* Copyright (c) 2017 MIT 6.813/6.831 course staff, all rights reserved.
+ * Redistribution of original or derived work requires permission of course staff.
+ */
+-->
+
+<head>
+  <meta charset="utf-8">
+  <title>CandyCrush</title>
+
+  <!-- Load style sheets -->
+  <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/4.0.0-alpha.6/css/bootstrap.css">
+
+  <link rel="stylesheet" href="mainLayout.css">
+
+  <!-- Use mobile-aware viewport -->
+  <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
+
+  <!-- Load any supplemental Javascript libraries here -->
+  <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.1.1/jquery.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/seedrandom/2.4.2/seedrandom.js">
+  </script>
+  <script src="candy.js"></script>
+  <script src="board.js"></script>
+  <script src="rules.js"></script>
+
+  <script>
+    // By default, the first board loaded by your page will be the same
+    // each time you load (which is accomplished by "seeding" the random
+    // number generator. This makes testing (and grading!) easier!
+    Math.seedrandom(0);
+
+
+    // A short jQuery extension to read query parameters from the URL.
+    $.extend({
+      getUrlVars: function() {
+        var vars = [],
+          pair;
+        var pairs = window.location.search.substr(1).split('&');
+        for (var i = 0; i < pairs.length; i++) {
+          pair = pairs[i].split('=');
+          vars.push(pair[0]);
+          vars[pair[0]] = pair[1] &&
+            decodeURIComponent(pair[1].replace(/\+/g, ' '));
+        }
+        return vars;
+      },
+      getUrlVar: function(name) {
+        return $.getUrlVars()[name];
+      }
+    });
+
+    // constants
+    var DEFAULT_BOARD_SIZE = 8;
+
+    // data model at global scope for easier debugging
+    var board;
+    var rules;
+
+    // initialize board
+    if ($.getUrlVar('size') && $.getUrlVar('size') >= 3) {
+      board = new Board($.getUrlVar('size'));
+    } else {
+      board = new Board(DEFAULT_BOARD_SIZE);
+    }
+
+    // load a rule
+    rules = new Rules(board);
+
+    // Final initialization entry point: the Javascript code inside this block
+    // runs at the end of start-up when the page has finished loading.
+    $(document).ready(function() {
+      // Your code here.
+      newBoard();
+      rules.prepareNewGame();
+      $(".move-button").attr("disabled", true);
+      $("#crush").attr("disabled", true);
+    });
+
+    // This function constantly checks if current space has valid moves to makes.
+    // If it does, the move button(s) are enabled. If not, the move buttons are disabled.
+    var verifyUserInput = function(){
+      var inputPosition = (document).getElementById('move-textField');
+      var coordinates = convertCoords(inputPosition.value);
+      var pattern = /^[a-hA-H][1-8]$/
+      var directions = ["up", "right", "down", "left"];
+      var currentCandy = board.getCandyAt(coordinates[0], coordinates[1]);
+      if(rules.getCandyCrushes().length == 0){
+        if(inputPosition.value.match(pattern)){
+          for(var i = 0; i < directions.length; i++){
+            if(rules.isMoveTypeValid(currentCandy, directions[i])){
+              $("." + directions[i]).attr("disabled", false);
+              $("." + directions[i]).attr("style", "background-color: #32CD32;");
+            }
+          }
+        } else {
+          // Source: https://api.jquery.com/attr/
+          $(".move-button").attr("disabled", true);
+          $(".move-button").attr("style", "background-color: #FCFCFC;");
+        }
+      }
+    }
+
+
+    // This function checks if there are candy crushes to be made.
+    // If there are, the crush button is enabled. If not, the crush button is disabled
+    var verifyCrushes = function(){
+      // Source: https://api.jquery.com/attr/
+      if(rules.getCandyCrushes().length > 0){
+        $("#crush").attr("disabled", false);
+        $("#crush").attr("style", "background-color: #32CD32;");
+      } else {
+        $("#crush").attr("disabled", true);
+        $("#crush").attr("style", "background-color: #FCFCFC;");
+      }
+    }
+
+    // Source: https://www.w3schools.com/jsref/met_win_setinterval.asp
+    // Repeats the two functions every 1/20th of a second
+    // (The time span could be bigger, but I found that if
+    // the user changes the move input too fast, the arrows don't
+    // disable and change colors fast enough)
+    setInterval(verifyUserInput, 50);
+    setInterval(verifyCrushes, 50);
+
+    /* Event Handlers */
+    // access the candy object with info.candy
+
+    // add a candy to the board
+    $(board).on('add', function(e, info) {
+      // Your code here.
+      var table = document.getElementById("board");
+      var rowNum = info.toRow;
+      var colNum = info.toCol;
+
+      var cell = table.rows[rowNum].cells[colNum];
+      cell.innerHTML = String.fromCharCode(colNum + 97) + (rowNum + 1).toString();
+      if(info.candy.toString() == "yellow"){
+        cell.setAttribute("style", "background-color: " + info.candy.toString() + ";");
+      } else {
+        cell.setAttribute("style", "background-color: " + info.candy.toString() + "; color: white;");
+      }
+      cell.setAttribute("id", "cell");
+    });
+
+    // move a candy on the board
+    $(board).on('move', function(e, info) {
+      // Your code here.
+      var table = document.getElementById("board");
+      var currentCell = table.rows[info.toRow].cells[info.toCol];
+
+      if(info.candy.toString() == "yellow"){
+        currentCell.setAttribute("style", "background-color: " + info.candy.toString() + ";");
+      } else {
+        currentCell.setAttribute("style", "background-color: " + info.candy.toString() + "; color: white;");
+      }
+    });
+
+    // remove a candy from the board
+    $(board).on('remove', function(e, info) {
+      // Your code here.
+      var table = document.getElementById("board");
+      var currentCell = table.rows[info.fromRow].cells[info.fromCol];
+
+      currentCell.setAttribute("style", "");
+    });
+
+    // move a candy on the board
+    $(board).on('scoreUpdate', function(e, info) {
+      // Your code here. To be implemented in pset 2.
+    });
+
+    // Button Events
+
+    // Checks if the user clicks the new game button
+    $(document).on('click', "#newGame", function(evt) {
+      // Your code here.
+      board.clear();
+      rules.prepareNewGame();
+      $(".textField").val("");
+      $(".textField").focus();
+      $(".move-button").attr("disabled", true);
+      $(".move-button").attr("style", "");
+      $("#crush").attr("disabled", true);
+    });
+
+    // Checks if the user clicks a move button
+    $(document).on('click', ".move-button", function(evt) {
+      // Your code here.
+      var inputPosition = (document).getElementById('move-textField');
+      var coordinates = convertCoords(inputPosition.value);
+      var pattern = /^[a-hA-H][1-8]$/
+      var direction = evt.target.id.substring(0, evt.target.id.indexOf("Arrow"));
+      var currentCandy = board.getCandyAt(coordinates[0], coordinates[1]);
+      if(inputPosition.value.match(pattern)){
+        if(rules.isMoveTypeValid(currentCandy, direction)){
+          board.flipCandies(currentCandy, board.getCandyInDirection(currentCandy, direction));
+          inputPosition.value = "";
+          inputPosition.focus();
+          $(".move-button").attr("disabled", true);
+          $(".move-button").attr("style", "background-color: #FCFCFC;");
+        } else {
+          console.log("Invalid move");
+        }
+      } else {
+        console.log("Input is not a valid space");
+      }
+    });
+
+
+    // Checks if the user clicks the crush button
+    $(document).on('click', "#crush", function(evt){
+      rules.removeCrushes([rules.getCandyCrushes()[0]])
+      setTimeout(rules.moveCandiesDown(), 500);
+    })
+
+    // keyboard events arrive here
+    $(document).on('keydown', function(evt) {
+      // Your code here.
+
+    });
+
+
+    // This makes the dynamic HTML table
+    function newBoard(){
+      var table = document.getElementById("board");
+
+      for(var i = 0; i < DEFAULT_BOARD_SIZE; i++){
+        var row = table.insertRow(i);
+        for(var j = 0; j < DEFAULT_BOARD_SIZE; j++){
+          var cell = table.rows[i].insertCell(j);
+          cell.id = "board";
+        }
+      }
+    }
+
+    // Takes a table space and outputs an array with
+    // an row and column number (Ex. c1 -> [0, 2])
+    function convertCoords(coordinates){
+      var splitCoords = coordinates.split("");
+      var colNum;
+      switch(splitCoords[0]){
+        case "a":
+          colNum = 0;
+          break;
+        case "b":
+          colNum = 1;
+          break;
+        case "c":
+          colNum = 2;
+          break;
+        case "d":
+          colNum = 3;
+          break;
+        case "e":
+          colNum = 4;
+          break;
+        case "f":
+          colNum = 5;
+          break;
+        case "g":
+          colNum = 6;
+          break;
+        case "h":
+          colNum = 7;
+          break;
+        default:
+          return [-1, -1];
+      }
+      return [splitCoords[1] - 1, colNum];
+    }
+
+  </script>
+
+
+</head>
+
+<body>
+  <div class="container-fluid">
+    <div class="row">
+      <div class="col-xl-3 col-sm-12 col-12 col" id="firstColumn">
+        <div>
+          <!-- Column 1 Code Here -->
+          <!-- Column 1 -->
+          <div class="col-item">
+            <h1 class="game-title">Candy Crush</h1>
+            <input type="button" id="newGame" name="newGame" value="New Game" class="btn new-game-button">
+          </div>
+        </div>
+      </div>
+
+      <div class="col-xl-6 col-sm-12 col-12 col" id="mainColumn">
+
+        <!-- Column 2 Code Here -->
+        <!-- Column 2 -->
+        <table class="table" id="board">
+
+        </table>
+      </div>
+
+      <div class="col-xl-3 col-sm-12 col-12 col" id="lastColumn">
+
+        <!-- Column 3 Code Here -->
+        <!-- Column 3 -->
+        <div class="move-textField col-item">
+          <label for="move">Move: </label>
+          <input type="text" name="textField" value="" class="textField" id="move-textField" maxlength="2" autofocus="">
+        </div>
+
+        <div class="d-pad col-item">
+          <div class="row">
+            <div class="col-12 col-item up-down-arrow">
+              <input type="button" class="btn move-button up" id="upArrow move-button" name="upArrow" value="&uarr;">
+            </div>
+          </div>
+          <div class="row">
+            <div class="col-6 col-item left-arrow">
+              <input type="button" class="btn move-button left" id="leftArrow move-button" name="leftArrow" value="&larr;">
+            </div>
+            <div class="col-6 col-item right-arrow">
+              <input type="button" class="btn move-button right" id="rightArrow move-button" name="rightArrow" value="&rarr;">
+            </div>
+          </div>
+          <div class="row">
+            <div class="col-12 col-item up-down-arrow">
+              <input type="button" class="btn move-button down" id="downArrow move-button" name="downArrow" value="&darr;">
+            </div>
+          </div>
+
+        </div>
+
+        <div class="crushButton col-item">
+          <input class = "btn" id="crush" type="button" name="crush" value="Crush Once">
+        </div>
+
+
+      </div>
+    </div> <!-- class="row" -->
+  </div> <!-- class="container" -->
+</body>
+
+</html>
